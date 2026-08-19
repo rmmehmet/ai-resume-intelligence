@@ -8,12 +8,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import get_settings
-from routers import health_router
+from models.resume import Resume  # noqa: F401 - ensures the model is registered before create_all
+from models.user import User  # noqa: F401 - ensures the model is registered before create_all
+from routers import auth_router, health_router, resume_router
+from services.database.session import Base, engine
 
 
 def create_app() -> FastAPI:
     """Application factory. Builds and returns a configured FastAPI instance."""
     settings = get_settings()
+
+    # Phase 2: create tables directly for local development. A proper
+    # migration tool (Alembic) can replace this once the schema stabilizes.
+    Base.metadata.create_all(bind=engine)
 
     app = FastAPI(
         title=settings.app_name,
@@ -29,6 +36,8 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health_router.router)
+    app.include_router(auth_router.router)
+    app.include_router(resume_router.router)
 
     return app
 

@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
 
     # Database (used starting Phase 2)
-    database_url: str = ""
+    database_url: str = "sqlite:///./dev.db"
 
     # Milvus (used starting Phase 5)
     milvus_host: str = ""
@@ -37,8 +37,16 @@ class Settings(BaseSettings):
     # Redis (used starting Phase 8)
     redis_url: str = ""
 
-    # Auth (used starting Phase 2)
-    jwt_secret: str = ""
+    # Auth (Phase 2)
+    jwt_secret: str = "dev-secret-change-me"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24  # 24 hours
+
+    # File storage (Phase 3)
+    # Local disk for now; abstracted so it can be swapped for S3/GCS later
+    # without touching the parsing or router layers.
+    upload_dir: str = "./uploads"
+    max_upload_size_mb: int = 10
 
     # LLM provider (used starting Phase 7)
     llm_api_key: str = ""

@@ -1,109 +1,3 @@
-# =========================
-# Python / FastAPI
-# =========================
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-
-# Virtual Environment
-venv/
-.venv/
-env/
-ENV/
-
-# Python cache / tools
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-
-# Environment variables
-.env
-.env.*
-!.env.example
-
-# =========================
-# Node / React / Vite
-# =========================
-node_modules/
-frontend/node_modules/
-
-# Vite build
-dist/
-frontend/dist/
-
-# Vite cache
-frontend/.vite/
-
-# =========================
-# IDE / Editors
-# =========================
-.vscode/
-.idea/
-.qodo/
-
-# =========================
-# OS
-# =========================
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# =========================
-# Logs
-# =========================
-*.log
-logs/
-
-# =========================
-# Temporary files
-# =========================
-*.tmp
-*.temp
-*.swp
-
-# =========================
-# Testing
-# =========================
-.pytest_cache/
-.coverage
-htmlcov/
-
-# =========================
-# Uploaded files / generated data
-# =========================
-uploads/
-temp/
-tmp/
-
-# =========================
-# AI / ML
-# =========================
-models/
-checkpoints/
-*.pt
-*.pth
-*.onnx
-*.bin
-*.safetensors
-
-# =========================
-# Database
-# =========================
-*.db
-*.sqlite
-*.sqlite3
-
-# =========================
-# Secrets
-# =========================
-*.pem
-*.key
-secrets/
-credentials/
-
 # Env
 .env
 *.env
@@ -119,7 +13,11 @@ venv/
 node_modules/
 dist/
 
+# Local file storage (Phase 3)
+backend/uploads/
+
 # OS / editor
 .DS_Store
 .vscode/
 .idea/
+.qodo/
