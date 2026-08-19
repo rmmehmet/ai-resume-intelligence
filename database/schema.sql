@@ -41,6 +41,19 @@ CREATE TABLE IF NOT EXISTS resumes (
 
 CREATE INDEX IF NOT EXISTS ix_resumes_user_id ON resumes (user_id);
 
+-- ats_scores (implemented - Phase 4)
+CREATE TABLE IF NOT EXISTS ats_scores (
+    id             SERIAL PRIMARY KEY,
+    resume_id      INTEGER NOT NULL REFERENCES resumes(id),
+    user_id        INTEGER NOT NULL REFERENCES users(id),
+    overall_score  FLOAT NOT NULL,                  -- 0-100
+    factors        JSONB NOT NULL,                  -- list of AtsFactorResult (key, label, points_earned, points_possible, passed, explanation)
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS ix_ats_scores_resume_id ON ats_scores (resume_id);
+CREATE INDEX IF NOT EXISTS ix_ats_scores_user_id ON ats_scores (user_id);
+
 -- =========================================================
 -- Planned entities (not yet implemented - added in later phases)
 -- =========================================================
@@ -66,3 +79,25 @@ CREATE INDEX IF NOT EXISTS ix_resumes_user_id ON resumes (user_id);
 
 -- projects
 --   Normalized project entries, if/when needed. (Later, if needed)
+
+-- jobs
+--   Job descriptions submitted by a user for matching/analysis. (Phase 5)
+
+-- job_requirements
+--   Structured requirements (skills, keywords, qualifications) extracted
+--   from a job description. (Phase 5)
+
+-- analyses
+--   A single analysis run linking a resume (version) to a job, tracking
+--   pipeline status (parsing -> ATS -> matching -> scoring -> optimization). (Phase 5)
+
+-- match_results
+--   Keyword / semantic / skill match results between a resume and a job,
+--   including the resulting job-match score. (Phase 5)
+
+-- optimization_requests
+--   Requests to AI-optimize a resume for a specific job, including
+--   fact-validation status against the original resume content. (Phase 7)
+
+-- subscriptions
+--   Billing/plan state for a user (free vs. paid tiers). (Later)
