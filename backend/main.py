@@ -9,9 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import get_settings
 from models.ats_score import AtsScore  # noqa: F401 - ensures the model is registered before create_all
+from models.job import Job  # noqa: F401 - ensures the model is registered before create_all
+from models.match_result import MatchResult  # noqa: F401 - ensures the model is registered before create_all
 from models.resume import Resume  # noqa: F401 - ensures the model is registered before create_all
 from models.user import User  # noqa: F401 - ensures the model is registered before create_all
-from routers import ats_router, auth_router, health_router, resume_router
+from routers import ats_router, auth_router, health_router, job_router, matching_router, resume_router
 from services.database.session import Base, engine
 
 
@@ -40,6 +42,8 @@ def create_app() -> FastAPI:
     app.include_router(auth_router.router)
     app.include_router(resume_router.router)
     app.include_router(ats_router.router)
+    app.include_router(job_router.router)
+    app.include_router(matching_router.router)
 
     return app
 

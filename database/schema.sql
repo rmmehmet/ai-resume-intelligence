@@ -54,6 +54,40 @@ CREATE TABLE IF NOT EXISTS ats_scores (
 CREATE INDEX IF NOT EXISTS ix_ats_scores_resume_id ON ats_scores (resume_id);
 CREATE INDEX IF NOT EXISTS ix_ats_scores_user_id ON ats_scores (user_id);
 
+-- jobs (implemented - Phase 5)
+CREATE TABLE IF NOT EXISTS jobs (
+    id               SERIAL PRIMARY KEY,
+    user_id          INTEGER NOT NULL REFERENCES users(id),
+    title            VARCHAR(255) NOT NULL,
+    description      TEXT NOT NULL,
+    required_skills  JSONB NOT NULL DEFAULT '[]',   -- skills detected via vocabulary matching
+    keywords         JSONB NOT NULL DEFAULT '[]',   -- frequent significant terms, excluding detected skills
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS ix_jobs_user_id ON jobs (user_id);
+
+-- match_results (implemented - Phase 5)
+CREATE TABLE IF NOT EXISTS match_results (
+    id                 SERIAL PRIMARY KEY,
+    user_id            INTEGER NOT NULL REFERENCES users(id),
+    resume_id          INTEGER NOT NULL REFERENCES resumes(id),
+    job_id             INTEGER NOT NULL REFERENCES jobs(id),
+    keyword_score      FLOAT NOT NULL,              -- 0-100
+    semantic_score     FLOAT NOT NULL,               -- 0-100, TF-IDF cosine similarity today
+    skill_score        FLOAT NOT NULL,               -- 0-100
+    overall_score      FLOAT NOT NULL,               -- weighted: 40% skill, 30% keyword, 30% semantic
+    matched_keywords   JSONB NOT NULL DEFAULT '[]',
+    missing_keywords   JSONB NOT NULL DEFAULT '[]',
+    matched_skills     JSONB NOT NULL DEFAULT '[]',
+    missing_skills     JSONB NOT NULL DEFAULT '[]',
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS ix_match_results_resume_id ON match_results (resume_id);
+CREATE INDEX IF NOT EXISTS ix_match_results_job_id ON match_results (job_id);
+CREATE INDEX IF NOT EXISTS ix_match_results_user_id ON match_results (user_id);
+
 -- =========================================================
 -- Planned entities (not yet implemented - added in later phases)
 -- =========================================================
@@ -75,25 +109,21 @@ CREATE INDEX IF NOT EXISTS ix_ats_scores_user_id ON ats_scores (user_id);
 --   Normalized education entries, if/when needed. (Later, if needed)
 
 -- skills
---   Normalized skill entities, linked to resumes and/or job requirements. (Phase 5)
+--   Normalized skill entities, if querying/filtering by skill across
+--   resumes/jobs is needed beyond the JSON columns already in place. (Later, if needed)
 
 -- projects
 --   Normalized project entries, if/when needed. (Later, if needed)
 
--- jobs
---   Job descriptions submitted by a user for matching/analysis. (Phase 5)
-
 -- job_requirements
---   Structured requirements (skills, keywords, qualifications) extracted
---   from a job description. (Phase 5)
+--   Normalized requirement rows, if needed beyond jobs.required_skills /
+--   jobs.keywords JSON columns. (Later, if needed)
 
 -- analyses
 --   A single analysis run linking a resume (version) to a job, tracking
---   pipeline status (parsing -> ATS -> matching -> scoring -> optimization). (Phase 5)
-
--- match_results
---   Keyword / semantic / skill match results between a resume and a job,
---   including the resulting job-match score. (Phase 5)
+--   pipeline status end-to-end (parsing -> ATS -> matching -> scoring ->
+--   optimization), if a unified pipeline-tracking view becomes useful
+--   beyond querying ats_scores/match_results directly. (Later, if needed)
 
 -- optimization_requests
 --   Requests to AI-optimize a resume for a specific job, including

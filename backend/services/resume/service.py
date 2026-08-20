@@ -9,6 +9,8 @@ import re
 
 from schemas.resume import ContactInfo, StructuredResume
 
+
+
 _EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 _PHONE_PATTERN = re.compile(r"(\+?\d[\d\s().-]{7,}\d)")
 
