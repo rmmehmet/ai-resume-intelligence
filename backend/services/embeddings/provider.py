@@ -1,48 +1,44 @@
 """
-Job business logic.
+Embedding / semantic similarity provider abstraction.
 
-Orchestrates requirement parsing and persistence. Routers call these
-functions; they never touch the parser or the database directly.
+External providers must be abstracted behind an interface so they
+can be swapped without touching business logic.
+
+`embed()` is the primitive: every concrete provider must turn text
+into a fixed-dimension vector. `similarity()` has a default
+implementation (cosine similarity of the two embeddings) so most
+providers only need to implement `embed()`. A provider whose
+vectors are NOT fixed-dimension (e.g. a per-comparison TF-IDF fit)
+should override `similarity()` directly and raise from `embed()`
+instead of pretending to support it.
 """
-from sqlalchemy.orm import Session
-
-from models.job import Job
-from schemas.job import JobCreate
-from services.job.parser import parse_job_requirements
+import math
+from abc import ABC, abstractmethod
 
 
-class JobNotFoundError(Exception):
-    """Raised when a requested job doesn't exist or doesn't belong to the user."""
+class EmbeddingProvider(ABC):
+    @abstractmethod
+    def embed(self, text: str) -> list[float]:
+        """Return a fixed-dimension vector embedding for `text`."""
+        raise NotImplementedError
+
+    def similarity(self, text_a: str, text_b: str) -> float:
+        """Return a 0.0-1.0 semantic similarity score between two texts."""
+        if not text_a.strip() or not text_b.strip():
+            return 0.0
+        return cosine_similarity(self.embed(text_a), self.embed(text_b))
 
 
-def create_job(db: Session, user_id: int, job_in: JobCreate) -> Job:
-    """Parse a job description's requirements and persist it."""
-    required_skills, keywords = parse_job_requirements(job_in.description)
+def cosine_similarity(vec_a: list[float], vec_b: list[float]) -> float:
+    """Cosine similarity between two equal-length vectors, clamped to [0, 1]."""
+    if not vec_a or not vec_b:
+        return 0.0
 
-    job = Job(
-        user_id=user_id,
-        title=job_in.title,
-        description=job_in.description,
-        required_skills=required_skills,
-        keywords=keywords,
-    )
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-    return job
+    dot = sum(a * b for a, b in zip(vec_a, vec_b))
+    norm_a = math.sqrt(sum(a * a for a in vec_a))
+    norm_b = math.sqrt(sum(b * b for b in vec_b))
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
 
-
-def list_jobs_for_user(db: Session, user_id: int) -> list[Job]:
-    return (
-        db.query(Job)
-        .filter(Job.user_id == user_id)
-        .order_by(Job.created_at.desc())
-        .all()
-    )
-
-
-def get_job_for_user(db: Session, user_id: int, job_id: int) -> Job:
-    job = db.query(Job).filter(Job.id == job_id, Job.user_id == user_id).first()
-    if job is None:
-        raise JobNotFoundError(f"Job {job_id} not found")
-    return job
+    score = dot / (norm_a * norm_b)
+    return max(0.0, min(1.0, score))

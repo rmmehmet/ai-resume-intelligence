@@ -31,8 +31,22 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./dev.db"
 
     # Milvus (used starting Phase 5)
+    # Preferred: milvus_uri (works for both Zilliz Cloud and self-hosted).
+    # milvus_host/milvus_port remain as a convenience fallback for a plain
+    # self-hosted Milvus instance (e.g. via docker-compose in production).
+    # Not required for the app to run - matching works without Milvus.
+    milvus_uri: str = ""
+    milvus_token: str = ""
     milvus_host: str = ""
     milvus_port: str = ""
+
+    # Embeddings (Phase 5+)
+    # "sentence-bert" gives real semantic embeddings (fixed-dimension,
+    # suitable for Milvus). "tfidf" is a lightweight, dependency-light
+    # fallback with no model download, but its vectors are NOT
+    # fixed-dimension - see services/embeddings/tfidf_provider.py.
+    embedding_provider: str = "sentence-bert"
+    embedding_model_name: str = ""  # empty = provider's own default
 
     # Redis (used starting Phase 8)
     redis_url: str = ""

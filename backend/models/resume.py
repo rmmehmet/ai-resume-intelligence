@@ -35,6 +35,14 @@ class Resume(Base):
 
     raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Fixed-dimension semantic embedding of raw_text (see
+    # services/embeddings/sentence_bert_provider.py), computed once at
+    # parse time and reused for every job match instead of recomputing
+    # it on every comparison.
+    embedding: Mapped[list | None] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=True
+    )
+
     # JSONB on PostgreSQL, plain JSON on SQLite (dev) - same column, different
     # storage under the hood, handled automatically by SQLAlchemy's dialect.
     structured_data: Mapped[dict | None] = mapped_column(

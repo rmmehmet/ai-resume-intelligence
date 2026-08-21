@@ -31,6 +31,13 @@ class Job(Base):
         JSON().with_variant(JSONB, "postgresql"), default=list, nullable=False
     )
 
+    # Fixed-dimension semantic embedding of description, computed once
+    # at creation time and reused for every resume match. See
+    # services/embeddings/sentence_bert_provider.py.
+    embedding: Mapped[list | None] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

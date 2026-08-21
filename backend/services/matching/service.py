@@ -17,9 +17,11 @@ from services.matching.skill_matcher import match_skills
 from services.resume.service import ResumeNotFoundError, get_resume_for_user
 
 # Weights for combining sub-scores into the overall match score.
-# Skill and keyword matches are concrete/verifiable, so they carry
-# more weight than the softer semantic similarity signal.
-_WEIGHTS = {"skill": 0.4, "keyword": 0.3, "semantic": 0.3}
+# Semantic similarity now comes from real sentence-BERT embeddings
+# (not TF-IDF word overlap), so it's trusted roughly as much as the
+# concrete/verifiable skill and keyword signals rather than being a
+# minor supporting factor.
+_WEIGHTS = {"skill": 0.35, "keyword": 0.30, "semantic": 0.35}
 
 
 class MatchResultNotFoundError(Exception):
@@ -41,7 +43,13 @@ def create_match(db: Session, user_id: int, resume_id: int, job_id: int) -> Matc
 
     matched_keywords, missing_keywords, keyword_score = match_keywords(resume_text, job.keywords)
     matched_skills, missing_skills, skill_score = match_skills(resume_skills, job.required_skills)
-    semantic_score = match_semantic(resume_text, job.description, get_embedding_provider())
+    semantic_score = match_semantic(
+        provider=get_embedding_provider(),
+        resume_text=resume_text,
+        job_description=job.description,
+        resume_embedding=resume.embedding,
+        job_embedding=job.embedding,
+    )
 
     overall_score = round(
         skill_score * _WEIGHTS["skill"]

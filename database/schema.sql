@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS ix_users_email ON users (email);
 
--- resumes (implemented - Phase 3)
+-- resumes (implemented - Phase 3, embedding added in Phase 5 refinement)
 CREATE TABLE IF NOT EXISTS resumes (
     id                SERIAL PRIMARY KEY,
     user_id           INTEGER NOT NULL REFERENCES users(id),
@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS resumes (
     storage_path      VARCHAR(500) NOT NULL,
     file_size_bytes   INTEGER NOT NULL,
     raw_text          TEXT,
+    embedding         JSONB,                        -- fixed-dim vector (384 for sentence-BERT MiniLM), null if not yet computed
     structured_data   JSONB,                        -- ContactInfo, summary, experience, education, skills, projects
     parsing_status    VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending | succeeded | failed
     parsing_error     TEXT,
@@ -54,14 +55,15 @@ CREATE TABLE IF NOT EXISTS ats_scores (
 CREATE INDEX IF NOT EXISTS ix_ats_scores_resume_id ON ats_scores (resume_id);
 CREATE INDEX IF NOT EXISTS ix_ats_scores_user_id ON ats_scores (user_id);
 
--- jobs (implemented - Phase 5)
+-- jobs (implemented - Phase 5, embedding added in Phase 5 refinement)
 CREATE TABLE IF NOT EXISTS jobs (
     id               SERIAL PRIMARY KEY,
     user_id          INTEGER NOT NULL REFERENCES users(id),
     title            VARCHAR(255) NOT NULL,
     description      TEXT NOT NULL,
     required_skills  JSONB NOT NULL DEFAULT '[]',   -- skills detected via vocabulary matching
-    keywords         JSONB NOT NULL DEFAULT '[]',   -- frequent significant terms, excluding detected skills
+    keywords         JSONB NOT NULL DEFAULT '[]',   -- frequent significant unigrams/bigrams, excluding detected skills
+    embedding        JSONB,                          -- fixed-dim vector (384 for sentence-BERT MiniLM), null if not yet computed
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -74,9 +76,9 @@ CREATE TABLE IF NOT EXISTS match_results (
     resume_id          INTEGER NOT NULL REFERENCES resumes(id),
     job_id             INTEGER NOT NULL REFERENCES jobs(id),
     keyword_score      FLOAT NOT NULL,              -- 0-100
-    semantic_score     FLOAT NOT NULL,               -- 0-100, TF-IDF cosine similarity today
+    semantic_score     FLOAT NOT NULL,               -- 0-100, sentence-BERT cosine similarity
     skill_score        FLOAT NOT NULL,               -- 0-100
-    overall_score      FLOAT NOT NULL,               -- weighted: 40% skill, 30% keyword, 30% semantic
+    overall_score      FLOAT NOT NULL,               -- weighted: 35% skill, 30% keyword, 35% semantic
     matched_keywords   JSONB NOT NULL DEFAULT '[]',
     missing_keywords   JSONB NOT NULL DEFAULT '[]',
     matched_skills     JSONB NOT NULL DEFAULT '[]',

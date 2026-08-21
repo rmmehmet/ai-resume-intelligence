@@ -1,97 +1,98 @@
 """
-Heuristic structuring of resume text into sections.
+Resume business logic.
 
-This is intentionally rule-based (keyword/section-header detection),
-not AI-powered - LLM-assisted understanding comes in Phase 7. The
-goal here is a reasonable best-effort structure, not perfection.
+Orchestrates storage, text extraction, and structuring. Routers call
+these functions; they never touch storage/extraction/structuring or
+the database directly.
 """
-import re
+from sqlalchemy.orm import Session
 
-from schemas.resume import ContactInfo, StructuredResume
+from models.resume import ParsingStatus, Resume
+from services.embeddings.service import get_embedding_provider
+from services.embeddings.vector_store import try_upsert
+from services.resume import storage
+from services.resume.extractor import TextExtractionError, extract_text
+from services.resume.structurer import structure_resume_text
 
-
-
-_EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
-_PHONE_PATTERN = re.compile(r"(\+?\d[\d\s().-]{7,}\d)")
-
-# Section header keywords, ordered by the section they map to. Matching is
-# case-insensitive and expects the line to be short (a heading, not a
-# sentence that happens to contain the word).
-_SECTION_KEYWORDS: dict[str, list[str]] = {
-    "summary": ["summary", "profile", "objective", "about me"],
-    "experience": ["experience", "work history", "employment"],
-    "education": ["education", "academic background"],
-    "skills": ["skills", "technical skills", "competencies"],
-    "projects": ["projects", "personal projects"],
-}
-
-_MAX_HEADING_LENGTH = 40
+RESUME_VECTOR_COLLECTION = "resume_embeddings"
 
 
-def _detect_section(line: str) -> str | None:
-    """Return the section name if `line` looks like a section heading, else None."""
-    stripped = line.strip()
-    if not stripped or len(stripped) > _MAX_HEADING_LENGTH:
-        return None
-
-    lowered = stripped.lower().strip(":")
-    for section, keywords in _SECTION_KEYWORDS.items():
-        if lowered in keywords:
-            return section
-    return None
+class ResumeNotFoundError(Exception):
+    """Raised when a requested resume doesn't exist or doesn't belong to the user."""
 
 
-def _extract_contact(text: str) -> ContactInfo:
-    email_match = _EMAIL_PATTERN.search(text)
-    phone_match = _PHONE_PATTERN.search(text)
+def upload_and_parse_resume(
+    db: Session,
+    user_id: int,
+    filename: str,
+    content: bytes,
+) -> Resume:
+    """
+    Validate, store, extract text from, and structure an uploaded resume.
 
-    # Heuristic: the resume's name is often the first non-empty line,
-    # as long as it doesn't look like contact info itself.
-    first_line = next((line.strip() for line in text.splitlines() if line.strip()), None)
-    name = None
-    if first_line and not _EMAIL_PATTERN.search(first_line) and len(first_line) <= _MAX_HEADING_LENGTH:
-        name = first_line
+    Parsing failures are captured on the Resume record rather than
+    raised, so the upload itself still succeeds and the user can see
+    what went wrong.
+    """
+    extension = storage.validate_upload(filename, len(content))
+    storage_path = storage.save_file(content, extension, user_id)
 
-    return ContactInfo(
-        name=name,
-        email=email_match.group(0) if email_match else None,
-        phone=phone_match.group(0).strip() if phone_match else None,
+    resume = Resume(
+        user_id=user_id,
+        original_filename=filename,
+        file_type=extension,
+        storage_path=storage_path,
+        file_size_bytes=len(content),
+        parsing_status=ParsingStatus.PENDING,
+    )
+
+    try:
+        raw_text = extract_text(content, extension)
+        structured = structure_resume_text(raw_text)
+
+        resume.raw_text = raw_text
+        resume.structured_data = structured.model_dump()
+        resume.parsing_status = ParsingStatus.SUCCEEDED
+
+        # Compute the embedding once here so every future job match reuses
+        # it instead of re-running the model on every comparison. Not every
+        # provider can produce a storable embedding (e.g. TfidfEmbeddingProvider
+        # fits per-comparison) - if so, leave it unset; matching falls back
+        # to computing similarity from raw text on the fly.
+        provider = get_embedding_provider()
+        try:
+            resume.embedding = provider.embed(raw_text)
+        except NotImplementedError:
+            resume.embedding = None
+    except TextExtractionError as exc:
+        resume.parsing_status = ParsingStatus.FAILED
+        resume.parsing_error = str(exc)
+
+    db.add(resume)
+    db.commit()
+    db.refresh(resume)
+
+    if resume.embedding:
+        try_upsert(RESUME_VECTOR_COLLECTION, len(resume.embedding), resume.id, resume.embedding)
+
+    return resume
+
+
+def list_resumes_for_user(db: Session, user_id: int) -> list[Resume]:
+    return (
+        db.query(Resume)
+        .filter(Resume.user_id == user_id)
+        .order_by(Resume.created_at.desc())
+        .all()
     )
 
 
-def structure_resume_text(raw_text: str) -> StructuredResume:
-    """Turn raw resume text into a best-effort StructuredResume."""
-    lines = raw_text.splitlines()
-
-    sections: dict[str, list[str]] = {name: [] for name in _SECTION_KEYWORDS}
-    current_section: str | None = None
-
-    for line in lines:
-        detected = _detect_section(line)
-        if detected is not None:
-            current_section = detected
-            continue
-
-        if current_section is not None and line.strip():
-            sections[current_section].append(line.strip())
-
-    contact = _extract_contact(raw_text)
-    summary_text = " ".join(sections["summary"]) if sections["summary"] else None
-
-    return StructuredResume(
-        contact=contact,
-        summary=summary_text,
-        experience=sections["experience"],
-        education=sections["education"],
-        skills=_split_skills(sections["skills"]),
-        projects=sections["projects"],
+def get_resume_for_user(db: Session, user_id: int, resume_id: int) -> Resume:
+    resume = (
+        db.query(Resume)
+        .filter(Resume.id == resume_id, Resume.user_id == user_id)
+        .first()
     )
-
-
-def _split_skills(skill_lines: list[str]) -> list[str]:
-    """Skills sections are often comma/bullet separated on one or few lines."""
-    skills: list[str] = []
-    for line in skill_lines:
-        parts = re.split(r"[,•|]", line)
-        skills.extend(part.strip() for part in parts if part.strip())
-    return skills
+    if resume is None:
+        raise ResumeNotFoundError(f"Resume {resume_id} not found")
+    return resume
