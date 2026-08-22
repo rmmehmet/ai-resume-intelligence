@@ -6,15 +6,13 @@ import { createJob, listJobs } from "../services/jobService";
 import { createMatch } from "../services/matchingService";
 import ScoreRing from "../components/ScoreRing";
 import FactorBreakdown from "../components/FactorBreakdown";
+import JobMatchPanel from "../components/JobMatchPanel";
 import MatchResultCard from "../components/MatchResultCard";
 
 export default function ResumeDetail() {
   const { resumeId } = useParams();
 
   const [resume, setResume] = useState(null);
-  const [latestScore, setLatestScore] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [atsError, setAtsError] = useState("");
 
   const [jobs, setJobs] = useState([]);
   const [selectedJobId, setSelectedJobId] = useState("");
@@ -23,6 +21,10 @@ export default function ResumeDetail() {
   const [jobDescription, setJobDescription] = useState("");
   const [isSavingJob, setIsSavingJob] = useState(false);
   const [jobError, setJobError] = useState("");
+
+  const [latestScore, setLatestScore] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [atsError, setAtsError] = useState("");
 
   const [matchResult, setMatchResult] = useState(null);
   const [isMatching, setIsMatching] = useState(false);
@@ -61,19 +63,6 @@ export default function ResumeDetail() {
     }
   }
 
-  async function handleAnalyze() {
-    setAtsError("");
-    setIsAnalyzing(true);
-    try {
-      const score = await analyzeResume(resumeId);
-      setLatestScore(score);
-    } catch (err) {
-      setAtsError(err.response?.data?.detail || "Couldn't run ATS analysis.");
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }
-
   async function handleSaveJob(e) {
     e.preventDefault();
     setJobError("");
@@ -89,6 +78,19 @@ export default function ResumeDetail() {
       setJobError(err.response?.data?.detail || "Couldn't save this job description.");
     } finally {
       setIsSavingJob(false);
+    }
+  }
+
+  async function handleAnalyze() {
+    setAtsError("");
+    setIsAnalyzing(true);
+    try {
+      const score = await analyzeResume(resumeId, selectedJobId || undefined);
+      setLatestScore(score);
+    } catch (err) {
+      setAtsError(err.response?.data?.detail || "Couldn't run ATS analysis.");
+    } finally {
+      setIsAnalyzing(false);
     }
   }
 
@@ -117,37 +119,12 @@ export default function ResumeDetail() {
       </Link>
       <h1 style={{ marginTop: 12 }}>{resume.original_filename}</h1>
 
-      {/* ATS Analysis */}
+      {/* Job selector - shared by ATS job-specific scan and full matching below */}
       <section className="card" style={{ marginTop: 24 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
-          <div>
-            <h2>ATS score</h2>
-            <p style={{ color: "var(--color-text-muted)", margin: 0 }}>
-              An explainable breakdown of how ATS-friendly this resume is.
-            </p>
-          </div>
-          <button className="btn btn-primary" onClick={handleAnalyze} disabled={isAnalyzing}>
-            {isAnalyzing ? "Analyzing..." : latestScore ? "Re-analyze" : "Run ATS analysis"}
-          </button>
-        </div>
-
-        {atsError && <p className="error-text">{atsError}</p>}
-
-        {latestScore && (
-          <div style={{ marginTop: 24, display: "flex", gap: 32, flexWrap: "wrap" }}>
-            <ScoreRing score={latestScore.overall_score} label="ATS score" />
-            <div style={{ flex: 1, minWidth: 260 }}>
-              <FactorBreakdown factors={latestScore.factors} />
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* Job Matching */}
-      <section className="card" style={{ marginTop: 20 }}>
-        <h2>Match against a job</h2>
+        <h2>Job to check against (optional)</h2>
         <p style={{ color: "var(--color-text-muted)", margin: 0 }}>
-          Pick a saved job description, or paste a new one, then run the match.
+          Pick a saved job description, or paste a new one. Leave unselected for a
+          general ATS parseability check.
         </p>
 
         <div style={{ marginTop: 16, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
@@ -161,7 +138,7 @@ export default function ResumeDetail() {
               minWidth: 220,
             }}
           >
-            <option value="">Select a job...</option>
+            <option value="">No specific job</option>
             {jobs.map((job) => (
               <option key={job.id} value={job.id}>
                 {job.title}
@@ -171,10 +148,6 @@ export default function ResumeDetail() {
 
           <button className="btn btn-secondary" onClick={() => setShowJobForm((s) => !s)}>
             {showJobForm ? "Cancel" : "+ New job description"}
-          </button>
-
-          <button className="btn btn-primary" onClick={handleMatch} disabled={!selectedJobId || isMatching}>
-            {isMatching ? "Matching..." : "Run match"}
           </button>
         </div>
 
@@ -208,8 +181,60 @@ export default function ResumeDetail() {
             </button>
           </form>
         )}
+      </section>
+
+      {/* ATS Analysis */}
+      <section className="card" style={{ marginTop: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
+          <div>
+            <h2>ATS score</h2>
+            <p style={{ color: "var(--color-text-muted)", margin: 0 }}>
+              Parseability and quality checks, based on how real ATS systems actually
+              read a resume - plus a keyword/skill scan if a job is selected above.
+            </p>
+          </div>
+          <button className="btn btn-primary" onClick={handleAnalyze} disabled={isAnalyzing}>
+            {isAnalyzing ? "Analyzing..." : latestScore ? "Re-analyze" : "Run ATS analysis"}
+          </button>
+        </div>
+
+        {atsError && <p className="error-text">{atsError}</p>}
+
+        {latestScore && (
+          <>
+            <div style={{ marginTop: 24, display: "flex", gap: 32, flexWrap: "wrap" }}>
+              <ScoreRing score={latestScore.overall_score} label="ATS score" />
+              <div style={{ flex: 1, minWidth: 260 }}>
+                <FactorBreakdown factors={latestScore.factors} />
+              </div>
+            </div>
+
+            {latestScore.job_match && <JobMatchPanel jobMatch={latestScore.job_match} />}
+          </>
+        )}
+      </section>
+
+      {/* Full semantic + keyword + skill match (Phase 5 engine) */}
+      <section className="card" style={{ marginTop: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
+          <div>
+            <h2>Full match analysis</h2>
+            <p style={{ color: "var(--color-text-muted)", margin: 0 }}>
+              Skill, keyword, and semantic (sentence-embedding) similarity against the
+              selected job.
+            </p>
+          </div>
+          <button className="btn btn-primary" onClick={handleMatch} disabled={!selectedJobId || isMatching}>
+            {isMatching ? "Matching..." : "Run match"}
+          </button>
+        </div>
 
         {matchError && <p className="error-text" style={{ marginTop: 16 }}>{matchError}</p>}
+        {!selectedJobId && (
+          <p style={{ marginTop: 16, fontSize: "0.85rem", color: "var(--color-text-muted)" }}>
+            Select a job above to enable this.
+          </p>
+        )}
       </section>
 
       {matchResult && (

@@ -49,6 +49,12 @@ class Resume(Base):
         JSON().with_variant(JSONB, "postgresql"), nullable=True
     )
 
+    # Structural ATS-parsability signals (multi-column, tables, contact
+    # info location, etc.) - see services/resume/layout_analyzer.py.
+    layout_analysis: Mapped[dict | None] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=True
+    )
+
     parsing_status: Mapped[ParsingStatus] = mapped_column(
         Enum(ParsingStatus), default=ParsingStatus.PENDING, nullable=False
     )

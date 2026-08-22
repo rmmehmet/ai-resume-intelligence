@@ -23,12 +23,21 @@ router = APIRouter(prefix="/api/ats", tags=["ats"])
 )
 def analyze_resume(
     resume_id: int,
+    job_id: int | None = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AtsScoreRead:
+    """
+    Run ATS analysis on a resume.
+
+    Pass `job_id` as a query param (?job_id=5) to also run a
+    job-specific keyword/skill scan against that job posting.
+    """
     try:
-        return ats_service.analyze_resume(db, user_id=current_user.id, resume_id=resume_id)
-    except ResumeNotFoundError as exc:
+        return ats_service.analyze_resume(
+            db, user_id=current_user.id, resume_id=resume_id, job_id=job_id
+        )
+    except (ResumeNotFoundError, ats_service.JobNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 

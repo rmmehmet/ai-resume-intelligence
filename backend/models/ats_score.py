@@ -1,9 +1,11 @@
 """
 ATS score ORM model.
 
-Stores the outcome of an ATS analysis run: the overall score and the
-full factor-by-factor breakdown that explains it. Business logic for
-computing the score lives in services/ats, not here.
+Stores the outcome of an ATS analysis run: the overall (job-independent)
+parsability/quality score and its factor breakdown, plus an optional
+job-specific keyword/skill scan - mirroring how real ATS systems work
+in practice: a generic parseability check, and a match score against
+a specific requisition when one is provided.
 """
 from datetime import datetime, timezone
 
@@ -28,6 +30,13 @@ class AtsScore(Base):
     # as-is so the full explanation is preserved exactly as it was computed.
     factors: Mapped[list] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"), nullable=False
+    )
+
+    # Optional job-specific keyword/skill scan, present only when the
+    # analysis was run with a job_id. See schemas/ats.py: AtsJobMatch.
+    job_id: Mapped[int | None] = mapped_column(ForeignKey("jobs.id"), nullable=True, index=True)
+    job_match: Mapped[dict | None] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=True
     )
 
     created_at: Mapped[datetime] = mapped_column(

@@ -12,6 +12,7 @@ from services.embeddings.service import get_embedding_provider
 from services.embeddings.vector_store import try_upsert
 from services.resume import storage
 from services.resume.extractor import TextExtractionError, extract_text
+from services.resume.layout_analyzer import analyze_layout
 from services.resume.structurer import structure_resume_text
 
 RESUME_VECTOR_COLLECTION = "resume_embeddings"
@@ -53,6 +54,11 @@ def upload_and_parse_resume(
         resume.raw_text = raw_text
         resume.structured_data = structured.model_dump()
         resume.parsing_status = ParsingStatus.SUCCEEDED
+
+        # Structural ATS-parsability signals (multi-column, tables,
+        # header/footer-only contact info) - computed once here since it
+        # requires the original file bytes, which aren't kept around.
+        resume.layout_analysis = analyze_layout(content, extension).model_dump()
 
         # Compute the embedding once here so every future job match reuses
         # it instead of re-running the model on every comparison. Not every

@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS ix_users_email ON users (email);
 
--- resumes (implemented - Phase 3, embedding added in Phase 5 refinement)
+-- resumes (implemented - Phase 3, embedding + layout_analysis added later)
 CREATE TABLE IF NOT EXISTS resumes (
     id                SERIAL PRIMARY KEY,
     user_id           INTEGER NOT NULL REFERENCES users(id),
@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS resumes (
     raw_text          TEXT,
     embedding         JSONB,                        -- fixed-dim vector (384 for sentence-BERT MiniLM), null if not yet computed
     structured_data   JSONB,                        -- ContactInfo, summary, experience, education, skills, projects
+    layout_analysis   JSONB,                        -- multi_column, has_tables, contact_only_in_header_footer, garbled_text_ratio, notes
     parsing_status    VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending | succeeded | failed
     parsing_error     TEXT,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -42,20 +43,22 @@ CREATE TABLE IF NOT EXISTS resumes (
 
 CREATE INDEX IF NOT EXISTS ix_resumes_user_id ON resumes (user_id);
 
--- ats_scores (implemented - Phase 4)
+-- ats_scores (implemented - Phase 4, job-specific scan added later)
 CREATE TABLE IF NOT EXISTS ats_scores (
     id             SERIAL PRIMARY KEY,
     resume_id      INTEGER NOT NULL REFERENCES resumes(id),
     user_id        INTEGER NOT NULL REFERENCES users(id),
-    overall_score  FLOAT NOT NULL,                  -- 0-100
+    overall_score  FLOAT NOT NULL,                  -- 0-100, job-independent parsability/quality score
     factors        JSONB NOT NULL,                  -- list of AtsFactorResult (key, label, points_earned, points_possible, passed, explanation)
+    job_id         INTEGER REFERENCES jobs(id),      -- nullable: set when analysis included a job-specific scan
+    job_match      JSONB,                            -- nullable AtsJobMatch: match_score, matched/missing skills+keywords for job_id
     created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS ix_ats_scores_resume_id ON ats_scores (resume_id);
 CREATE INDEX IF NOT EXISTS ix_ats_scores_user_id ON ats_scores (user_id);
 
--- jobs (implemented - Phase 5, embedding added in Phase 5 refinement)
+-- jobs (implemented - Phase 5, embedding added later)
 CREATE TABLE IF NOT EXISTS jobs (
     id               SERIAL PRIMARY KEY,
     user_id          INTEGER NOT NULL REFERENCES users(id),

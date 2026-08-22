@@ -2,8 +2,10 @@
 Skill matching.
 
 Compares the resume's listed skills against the job's required
-skills. Pure function, no I/O.
+skills. Synonym/acronym-aware: e.g. a resume listing "Kubernetes"
+matches a job requiring "K8s" - see services/matching/synonyms.py.
 """
+from services.matching.synonyms import expand_terms
 
 
 def match_skills(
@@ -16,8 +18,19 @@ def match_skills(
         return [], [], 100.0
 
     resume_skills_lower = {s.lower().strip() for s in resume_skills}
-    matched = [skill for skill in job_required_skills if skill.lower() in resume_skills_lower]
-    missing = [skill for skill in job_required_skills if skill not in matched]
+    # Expand each of the resume's own skills too, so a resume skill and
+    # a job requirement match if either side's synonym set overlaps.
+    resume_terms: set[str] = set()
+    for skill in resume_skills_lower:
+        resume_terms |= expand_terms(skill)
+
+    matched = []
+    missing = []
+    for skill in job_required_skills:
+        if expand_terms(skill) & resume_terms:
+            matched.append(skill)
+        else:
+            missing.append(skill)
 
     score = round((len(matched) / len(job_required_skills)) * 100, 1)
     return matched, missing, score

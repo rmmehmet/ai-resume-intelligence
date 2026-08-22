@@ -16,11 +16,17 @@ _PHONE_PATTERN = re.compile(r"(\+?\d[\d\s().-]{7,}\d)")
 # case-insensitive and expects the line to be short (a heading, not a
 # sentence that happens to contain the word).
 _SECTION_KEYWORDS: dict[str, list[str]] = {
-    "summary": ["summary", "profile", "objective", "about me"],
-    "experience": ["experience", "work history", "employment"],
-    "education": ["education", "academic background"],
-    "skills": ["skills", "technical skills", "competencies"],
-    "projects": ["projects", "personal projects"],
+    "summary": ["summary", "profile", "objective", "about me", "professional summary"],
+    "experience": [
+        "experience", "work history", "employment", "professional experience",
+        "work experience", "career history", "relevant experience",
+    ],
+    "education": ["education", "academic background", "academic history", "qualifications"],
+    "skills": [
+        "skills", "technical skills", "competencies", "core competencies",
+        "areas of expertise", "key skills",
+    ],
+    "projects": ["projects", "personal projects", "selected projects", "notable projects"],
 }
 
 _MAX_HEADING_LENGTH = 40

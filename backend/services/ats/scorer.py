@@ -15,6 +15,7 @@ def score_resume(
     structured_data: dict | None,
     raw_text: str | None,
     parsing_status: ParsingStatus,
+    layout_analysis: dict | None,
 ) -> tuple[float, list[AtsFactorResult]]:
     """
     Compute an explainable ATS score for a resume.
@@ -23,9 +24,10 @@ def score_resume(
     """
     structured = structured_data or {}
     text = raw_text or ""
+    layout = layout_analysis or {}
 
     factors = [
-        rule(structured=structured, raw_text=text, parsing_status=parsing_status)
+        rule(structured=structured, raw_text=text, parsing_status=parsing_status, layout=layout)
         for rule in ALL_RULES
     ]
 
