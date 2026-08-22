@@ -27,14 +27,16 @@ class Settings(BaseSettings):
     # CORS
     cors_origins: str = "http://localhost:5173"
 
-    # Database (used starting Phase 2)
-    database_url: str = "sqlite:///./dev.db"
+    # Database - PostgreSQL only. No default: must be set explicitly in
+    # .env so the app never silently falls back to a throwaway database.
+    # Example: postgresql://user:password@localhost:5432/resume_ats
+    database_url: str = ""
 
-    # Milvus (used starting Phase 5)
+    # Milvus (self-hosted standalone via Docker, or Zilliz Cloud)
     # Preferred: milvus_uri (works for both Zilliz Cloud and self-hosted).
     # milvus_host/milvus_port remain as a convenience fallback for a plain
-    # self-hosted Milvus instance (e.g. via docker-compose in production).
-    # Not required for the app to run - matching works without Milvus.
+    # self-hosted Milvus instance. Not required for the app to run -
+    # matching works without Milvus.
     milvus_uri: str = ""
     milvus_token: str = ""
     milvus_host: str = ""
